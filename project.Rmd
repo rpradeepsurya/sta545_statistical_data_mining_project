@@ -1,0 +1,77 @@
+---
+title: "STA545 Project"
+author: |
+    | Estimation of Obesity levels
+    | UB PERSON ID: 50435306
+date: "`r Sys.Date()`"
+output: pdf_document
+extra_dependencies: ['amsmath', 'someotherpackage']
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(42)
+```
+
+Importing data
+
+```{r}
+# importing dataset - csv file
+
+data <- read.csv("ObesityData.csv")
+data
+summary(data)
+```
+
+```{r}
+# Checking for null values
+any(is.na(data))
+```
+
+Dataset doesn't contain any null values.
+
+```{r}
+# Numeric predictors
+num.cols <- c("Age", "Height", "Weight")
+
+# Categorical Predictors
+cat.cols <- c("Gender", "family_history_with_overweight", "FAVC", "FCVC",
+              "NCP", "CAEC", "SMOKE", "CH2O", "SCC", "FAF", "TUE", "CALC",
+              "MTRANS")
+```
+
+
+```{r}
+# Analyzing the target variable
+library(tidyverse)
+
+obesity.level <- data$NObeyesdad
+
+ggplot(data = data) + geom_bar(mapping = aes(x = obesity.level))
+```
+```{r}
+
+# Total count of each category in target variable
+
+data %>% count(NObeyesdad)
+```
+```{r}
+# Distribution of numeric columns
+
+for (col in num.cols) {
+  ggplot(data = data) + geom_histogram(mapping = aes(x = col), binwidth = 0.5)
+}
+
+```
+```{r}
+for (var in num.cols) {
+  #col <- eval(as.name(paste(var)))
+  print(ggplot(data, aes(x=eval(as.name(paste(var))),y=after_stat(density))) + xlab(var) +
+  geom_histogram(position='dodge', binwidth=1, fill="#FF9999", color="#e9ecef") +
+  geom_density(alpha=0.25))
+}
+
+```
+
+
+
