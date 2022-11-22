@@ -2,7 +2,7 @@
 title: "STA545 Project"
 author: |
     | Estimation of Obesity levels
-    | UB PERSON ID: 50435306
+    | Team: 16
 date: "`r Sys.Date()`"
 output: pdf_document
 extra_dependencies: ['amsmath', 'someotherpackage']
@@ -22,6 +22,7 @@ data <- read.csv("ObesityData.csv")
 data
 summary(data)
 ```
+# Data Analysis
 
 ```{r}
 # Checking for null values
@@ -47,7 +48,8 @@ library(tidyverse)
 
 obesity.level <- data$NObeyesdad
 
-ggplot(data = data) + geom_bar(mapping = aes(x = obesity.level))
+ggplot(data = data, aes(x=obesity.level)) + geom_bar(stat='count') + 
+  stat_count(geom = "text", colour = "white", size = 3.5, aes(label = ..count..), position=position_stack(vjust=0.5))
 ```
 ```{r}
 
@@ -55,14 +57,7 @@ ggplot(data = data) + geom_bar(mapping = aes(x = obesity.level))
 
 data %>% count(NObeyesdad)
 ```
-```{r}
-# Distribution of numeric columns
 
-for (col in num.cols) {
-  ggplot(data = data) + geom_histogram(mapping = aes(x = col), binwidth = 0.5)
-}
-
-```
 ```{r}
 for (var in num.cols) {
   #col <- eval(as.name(paste(var)))
@@ -74,4 +69,170 @@ for (var in num.cols) {
 ```
 
 
+```{r}
+# Categorical predictors count
+
+library(dplyr) 
+
+for (var in cat.cols) {
+  data %>% count(.data[[var]]) %>% print()
+}
+
+```
+
+```{r}
+# Encoding categorical to numeric
+dat <- cbind(data)
+
+# Label encoding categorical predictors with two levels into binary 
+dat$Gender <- ifelse(dat$Gender == "Male", 1, 0)
+dat$FAVC <- ifelse(dat$FAVC == "yes", 1, 0)
+dat$SMOKE <- ifelse(dat$SMOKE == "yes", 1, 0)
+dat$SCC <- ifelse(dat$SCC == "yes", 1, 0)
+dat$CALC <- ifelse(dat$CALC == "yes", 1, 0)
+dat$family_history_with_overweight <- ifelse(dat$family_history_with_overweight == "yes", 1, 0)
+
+```
+
+```{r}
+# One hot encoding categorical predictors with more than two levels
+
+library(caret)
+
+one.hot <- dummyVars(~ CAEC + MTRANS, data = dat, fullRank = T)
+dat_encoded <- data.frame(predict(one.hot, newdata = dat))
+
+```
+
+```{r}
+# Replacing categorical valus in response column with numeric values
+
+library(plyr)
+
+dat$NObeyesdad <- mapvalues(dat$NObeyesdad, 
+          from=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"), 
+          to=c(0, 1, 2, 3, 4, 5, 6))
+```
+
+
+```{r}
+
+# merging data frame
+
+data.final <- cbind(dat, dat_encoded)
+data.final <- select(data.final, -CAEC, -MTRANS)
+```
+
+```{r}
+# Analyzing the correlation of variables
+library(PerformanceAnalytics)
+
+# converting datatype to numeric
+df <- sapply(data.final, as.numeric)
+
+chart.Correlation(df[,c('Age', 'Height', 'Weight', 'NObeyesdad')], histogram=TRUE, pch=19)
+```
+
+
+# Modelling
+
+```{r}
+# train test split
+library(caret)
+
+set.seed(545)
+# stratified split; train: 75%, test: 25%
+indices <- createDataPartition(data.final$NObeyesdad, p = 0.75, list = FALSE)
+
+train <- data.final[indices,]
+test <- data.final[-indices,]
+```
+
+
+
+```{r}
+# Decision Tree
+library(rpart)
+library(rpart.plot)
+
+tree.fit <- rpart(NObeyesdad ~ . , data = train)
+summary(tree.fit)
+```
+
+
+```{r}
+rpart.plot(tree.fit, trace=-1)
+```
+
+
+```{r}
+# Train Test set prediction result
+
+tree.predtrain <- predict(tree.fit, train, type = "class")
+tree.predtest <- predict(tree.fit, test, type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+
+```{r}
+
+# Adding new feature BMI (weight/(height^2))
+
+train <- transform(train, BMI=Weight/(Height^2))
+test <- transform(test, BMI=Weight/(Height^2))
+
+```
+
+```{r}
+
+df <- sapply(train, as.numeric)
+
+chart.Correlation(df[,c('Age', 'Height', 'Weight', 'BMI', 'NObeyesdad')], 
+                  histogram=TRUE, pch=19)
+```
+BMI can clearly separate the 7 categories of the response variable.
+
+```{r}
+
+tree.fit <- rpart(NObeyesdad ~ . , data = train)
+
+tree.predtrain <- predict(tree.fit, train, type = "class")
+tree.predtest <- predict(tree.fit, test, type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+
+```
+Adding new feature 'BMI' decreased the misclassification error rate in test data from 16.6% to 3.6%.
+
+```{r}
+# Confusion matrix
+table(tree.predtrain, train$NObeyesdad)
+table(tree.predtest, test$NObeyesdad)
+```
+
+```{r}
+
+# Only using BMI predictor
+
+tree.fit <- rpart(NObeyesdad ~ BMI , data = train)
+
+tree.predtrain <- predict(tree.fit, train['BMI'], type = "class")
+tree.predtest <- predict(tree.fit, test['BMI'], type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+Only with BMI predictor, the model performs pretty good.
 
