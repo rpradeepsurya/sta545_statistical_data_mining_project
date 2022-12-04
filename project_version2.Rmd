@@ -206,6 +206,7 @@ data.final <- cbind(dat, dat_encoded)
 data.final <- select(data.final, -CAEC, -MTRANS)
 ```
 
+
 ```{r}
 # Analyzing the correlation of variables
 library(PerformanceAnalytics)
@@ -487,8 +488,8 @@ print(paste("Misclassification error rate in test = ", round(gbm.test.error*100,
 set.seed(545)
 
 rf.fit <- randomForest(
-  Purchase ~ ., 
-  data = train,
+  NObeyesdad ~ ., 
+  data = sapply(train, as.numeric),
   importance = TRUE,
   ntree = 5000
 )
@@ -497,13 +498,20 @@ rf.pred <- predict(rf.fit, train, type='class')
 rf.predtest <- predict(rf.fit, test, type='class')
 
 writeLines("--- Training Error - Random Forest ---")
-print(mean(rf.pred != train$Purchase))
+print(mean(rf.pred != train$NObeyesdad))
 
-table(rf.pred, train$Purchase)
+table(rf.pred, train$NObeyesdad)
 
 rf.fit
 ```
 
+```{r}
+print("--- Training Error - Random Forest ---")
+print(mean(round(rf.pred) != train$NObeyesdad))
+
+print("--- Test Error - Random Forest ---")
+print(mean(round(rf.predtest) != test$NObeyesdad))
+```
 
 
 
