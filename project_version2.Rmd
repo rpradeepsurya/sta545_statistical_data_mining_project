@@ -157,7 +157,7 @@ regplot(data2,model=1,digits=3, position=3, ylab="height", xlab="weight",col="re
 This graph shows us there is a trending upwards relationship between weight and height with both genders, with the regression line for females slightly steeper than that of males, meaning that the same increase in weight for females corresponds to a slightly larger increase in height. We can also see that data points corresponding to weights of male are more clustered than females.
 
 
-
+### CALC
 ```{r}
 # Encoding categorical to numeric
 dat <- cbind(data)
@@ -167,7 +167,11 @@ dat$Gender <- ifelse(dat$Gender == "Male", 1, 0)
 dat$FAVC <- ifelse(dat$FAVC == "yes", 1, 0)
 dat$SMOKE <- ifelse(dat$SMOKE == "yes", 1, 0)
 dat$SCC <- ifelse(dat$SCC == "yes", 1, 0)
-dat$CALC <- ifelse(dat$CALC == "yes", 1, 0)
+#dat$CALC <- ifelse(dat$CALC == "yes", 1, 0)
+dat$CALC <- mapvalues(dat$CALC, 
+          from=c("Always", "Frequently","Sometimes","no"), 
+          to=c(4,3,2,1))
+
 dat$family_history_with_overweight <- ifelse(dat$family_history_with_overweight == "yes", 1, 0)
 
 ```
@@ -183,7 +187,7 @@ dat_encoded <- data.frame(predict(one.hot, newdata = dat))
 ```
 
 ```{r}
-# Replacing categorical valus in response column with numeric values
+# Replacing categorical values in response column with numeric values
 
 library(plyr)
 
@@ -474,6 +478,30 @@ gbm.test.error <- mean(gbm.predtest != test1$NObeyesdad)
 
 print(paste("Misclassification error rate in train = ", round(gbm.train.error*100,4),"%"))
 print(paste("Misclassification error rate in test = ", round(gbm.test.error*100,4),"%"))
+```
+
+
+### Random forest
+
+```{r}
+set.seed(545)
+
+rf.fit <- randomForest(
+  Purchase ~ ., 
+  data = train,
+  importance = TRUE,
+  ntree = 5000
+)
+
+rf.pred <- predict(rf.fit, train, type='class')
+rf.predtest <- predict(rf.fit, test, type='class')
+
+writeLines("--- Training Error - Random Forest ---")
+print(mean(rf.pred != train$Purchase))
+
+table(rf.pred, train$Purchase)
+
+rf.fit
 ```
 
 
