@@ -92,9 +92,10 @@ Analyzing the categorical data and count
 # Categorical predictors count
 
 library(dplyr) 
+library(plyr)
 
 for (var in cat.cols) {
-  data %>% count(.data[[var]]) %>% print()
+  data %>% count(data[[var]]) %>% print()
 }
 
 ```
@@ -366,7 +367,7 @@ print(paste("Misclassification error rate in test = ", round(svm.test.error*100,
 
 ```
 ```{r}
-plot(svm1,test1,Age~Height)
+plot(svm1,test,Age~Height)
 ```
 # Bagging and Boosting Models
 
@@ -451,7 +452,7 @@ options(warn=-1)
 
 boost <- gbm(
   NObeyesdad ~ ., 
-  data = train1, 
+  data = train, 
   distribution = "multinomial",
   n.trees = 100,
   #interaction.depth = 4
@@ -487,6 +488,7 @@ print(paste("Misclassification error rate in test = ", round(gbm.test.error*100,
 
 ```{r}
 set.seed(545)
+library(randomForest)
 
 rf.fit <- randomForest(
   NObeyesdad ~ ., 
@@ -507,7 +509,13 @@ print(mean(round(rf.predtest) != test$NObeyesdad))
 table(rf.pred, train$NObeyesdad)
 table(rf.predtest, test$NObeyesdad)
 
+
 ```
+```{r}
+varImpPlot(rf.fit)
+```
+
+
 ```{r}
 svm.error <- mean(svm.predtrain != train$NObeyesdad)
 tree.error <- mean(tree.predtrain != train$NObeyesdad)
