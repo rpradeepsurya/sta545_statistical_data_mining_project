@@ -159,6 +159,7 @@ This graph shows us there is a trending upwards relationship between weight and 
 
 ### CALC
 ```{r}
+library(plyr)
 # Encoding categorical to numeric
 dat <- cbind(data)
 
@@ -232,7 +233,7 @@ train <- data.final[indices,]
 test <- data.final[-indices,]
 ```
 
-
+### Decision Tree
 
 ```{r}
 # Decision Tree
@@ -247,7 +248,7 @@ summary(tree.fit)
 ```{r}
 rpart.plot(tree.fit, trace=-1)
 ```
-
+### Decision tree test
 
 ```{r}
 # Train Test set prediction result
@@ -326,14 +327,14 @@ Only with BMI predictor, the model performs pretty good.
 library(e1071)  
 
 #dropping CALC as it contains only 0
-train1 <- subset(train, select=-c(CALC))
+#train1 <- subset(train, select=-c(CALC))
 
 #train1$NObeyesdad <- mapvalues(train1$NObeyesdad,
                             #to=c(0, 1, 2, 3, 4, 5, 6),
           #from=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
                  #"Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
 
- svm1 <- svm(NObeyesdad~., data=train1, 
+ svm1 <- svm(NObeyesdad~., data=train, 
           type="C-classification", kernal="radial", 
           gamma=0.1, cost=5)
  
@@ -344,16 +345,16 @@ train1 <- subset(train, select=-c(CALC))
 
 ```{r}
 #training prediction
-svm.predtrain <- predict(svm1, train1)
-xtab.train <- table(train1$NObeyesdad, svm.predtrain)
+svm.predtrain <- predict(svm1, train)
+xtab.train <- table(train$NObeyesdad, svm.predtrain)
 print("Confussion matrix for train data")
 xtab.train
 
 #test prediction
-test1 <- subset(test, select=-c(CALC))
-svm.predtest <- predict(svm1, test1)
-xtab.test <- table(test1$NObeyesdad, svm.predtest)
-print("Confussion matrix for test data")
+#test1 <- subset(test, select=-c(CALC))
+svm.predtest <- predict(svm1, test)
+xtab.test <- table(test$NObeyesdad, svm.predtest)
+print("Confusion matrix for test data")
 xtab.test
 ```
 ```{r}
@@ -377,14 +378,14 @@ options(warn=-1)
 library(ipred)
 library(randomForest)
 
-train1<-train
+#train1<-train
 
-train1$NObeyesdad <- mapvalues(train1$NObeyesdad,
+train$NObeyesdad <- mapvalues(train$NObeyesdad,
                             from=c(0, 1, 2, 3, 4, 5, 6),
           to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
                  "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
 
-gbag <- bagging(as.factor(NObeyesdad) ~ ., data = train1,coob=T,nbag=100)
+gbag <- bagging(as.factor(NObeyesdad) ~ ., data = train,coob=T,nbag=100)
 print(gbag)
 
 
@@ -393,21 +394,21 @@ print(gbag)
 
 ```{r}
 #training prediction
-bag.predtrain <- predict(gbag, train1)
-xtab.train <- table(train1$NObeyesdad, bag.predtrain)
+bag.predtrain <- predict(gbag, train)
+xtab.train <- table(train$NObeyesdad, bag.predtrain)
 print("Confussion matrix for train data")
 xtab.train
 
 #test prediction
-test1<-test
+#test1<-test
 
-test1$NObeyesdad <- mapvalues(test1$NObeyesdad,
+test$NObeyesdad <- mapvalues(test$NObeyesdad,
                             from=c(0, 1, 2, 3, 4, 5, 6),
           to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
                  "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
 
 bag.predtest <- predict(gbag, test)
-xtab.test <- table(test1$NObeyesdad, bag.predtest)
+xtab.test <- table(test$NObeyesdad, bag.predtest)
 print("Confussion matrix for test data")
 xtab.test
 
@@ -491,26 +492,40 @@ rf.fit <- randomForest(
   NObeyesdad ~ ., 
   data = sapply(train, as.numeric),
   importance = TRUE,
-  ntree = 5000
+  ntree = 10000
 )
 
 rf.pred <- predict(rf.fit, train, type='class')
 rf.predtest <- predict(rf.fit, test, type='class')
 
-writeLines("--- Training Error - Random Forest ---")
-print(mean(rf.pred != train$NObeyesdad))
-
-table(rf.pred, train$NObeyesdad)
-
-rf.fit
-```
-
-```{r}
 print("--- Training Error - Random Forest ---")
 print(mean(round(rf.pred) != train$NObeyesdad))
 
 print("--- Test Error - Random Forest ---")
 print(mean(round(rf.predtest) != test$NObeyesdad))
+
+table(rf.pred, train$NObeyesdad)
+table(rf.predtest, test$NObeyesdad)
+
+```
+```{r}
+svm.error <- mean(svm.predtrain != train$NObeyesdad)
+tree.error <- mean(tree.predtrain != train$NObeyesdad)
+
+print(paste("SVM error = ", svm.error))
+print(paste("Tree error = ", tree.error))
+```
+
+# Ensemble
+
+```{r}
+new_df <- data.frame(svm.predtrain, tree.predtrain, train$NObeyesdad)
+entree.fit <- rpart(train.NObeyesdad ~ . , data = new_df)
+
+entree.pred <- predict(entree.fit, new_df, type = "class")
+entree.error <- mean(entree.pred != new_df$train.NObeyesdad)
+
+print(paste("Ensemble tree error = ", entree.error))
 ```
 
 
