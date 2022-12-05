@@ -236,3 +236,17 @@ print(paste("Misclassification error rate in test = ", test.error))
 ```
 Only with BMI predictor, the model performs pretty good.
 
+```{r}
+#Random forest
+library(randomForest)
+library(gbm)
+set.seed(1)
+rf.obesity <- randomForest(NObeyesdad ~ . , data = df , mtry = sqrt(ncol(df) -1) , ntree = 5000, importance = TRUE)
+rf.obesity
+```
+
+```{r}
+predict.rf.Obesity <- predict(rf.obesity, data=df, type ="class")
+mean(predict.rf.Obesity != train$NObeyesdad)
+```
+
