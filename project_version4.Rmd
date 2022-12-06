@@ -503,8 +503,8 @@ print(boost)
 
 ```{r}
 #training prediction
-gbm.predtrain <- predict(boost, train1)
-xtab.train <- table(train1$NObeyesdad, gbm.predtrain)
+gbm.predtrain <- predict(boost, train)
+xtab.train <- table(train$NObeyesdad, gbm.predtrain)
 print("Confussion matrix for train data")
 xtab.train
 
@@ -528,6 +528,13 @@ print(paste("Misclassification error rate in test = ", round(gbm.test.error,4),"
 ### Random forest
 
 ```{r}
+set.seed(1)
+bestmtry <-tuneRF(sapply(train, as.numeric),sapply(train$NObeyesdad, as.numeric),improve = 0.01, stepFactor = 1.5, ntree=5000, trace = TRUE, plot = TRUE)
+print(bestmtry)
+```
+
+
+```{r}
 set.seed(545)
 library(randomForest)
 
@@ -535,7 +542,8 @@ rf.fit <- randomForest(
   NObeyesdad ~ ., 
   data = sapply(train, as.numeric),
   importance = TRUE,
-  ntree = 10000
+  mtry = 15,
+  ntree = 5000
 )
 
 rf.pred <- predict(rf.fit, train, type='class')
@@ -552,8 +560,12 @@ table(rf.predtest, test$NObeyesdad)
 
 
 ```
+
 ```{r}
+rf.fit
 varImpPlot(rf.fit)
+importance(rf.fit)
+
 ```
 
 
