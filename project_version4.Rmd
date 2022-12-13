@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 set.seed(42)
 ```
 
-Importing data
+## Importing data
 
 ```{r}
 # importing dataset - csv file
@@ -66,12 +66,12 @@ obesity.level <- data$NObeyesdad
 ggplot(data = data, aes(x=obesity.level)) + geom_bar(stat='count') + 
   stat_count(geom = "text", colour = "white", size = 3.5, aes(label = ..count..), position=position_stack(vjust=0.5))
 ```
+
 ```{r}
-
-# Total count of each category in target variable
-
-data %>% count(NObeyesdad)
+summary(data)
 ```
+
+
 The above bar graph and the distribution of the data shows that Obesity_Type_I is the most common among the respondents and Insufficient_Weight is the least common one
 
 
@@ -86,6 +86,14 @@ for (var in num.cols) {
 }
 
 ```
+```{r}
+cat.cols
+```
+```{r}
+data %>% count(data[['Gender']]) %>% print()
+```
+
+
 Analyzing the categorical data and count
 
 ```{r}
@@ -205,7 +213,11 @@ dat$NObeyesdad <- mapvalues(dat$NObeyesdad,
 # merging data frame
 
 data.final <- cbind(dat, dat_encoded)
-data.final <- select(data.final, -CAEC, -MTRANS)
+
+data.final <- data.final[,-9]
+data.final <- data.final[,-15]
+
+#data.final <- select(data.final, -CAEC, -MTRANS)
 ```
 
 
@@ -218,8 +230,6 @@ df <- sapply(data.final, as.numeric)
 
 chart.Correlation(df[,c('Age', 'Height', 'Weight', 'NObeyesdad')], histogram=TRUE, pch=19)
 ```
-
-
 # Modelling
 
 ```{r}
@@ -241,13 +251,19 @@ test <- data.final[-indices,]
 library(rpart)
 library(rpart.plot)
 
-tree.fit <- rpart(NObeyesdad ~ . , data = train)
+#train.df <- data.frame(sapply(train, as.numeric))
+#train.df['NObeyesdad'] <- data['NObeyesdad']
+
+tree.fit <- rpart(NObeyesdad ~ . , data = train, method='class')
 summary(tree.fit)
 ```
 
 
 ```{r}
-rpart.plot(tree.fit, trace=-1)
+library(zoom)
+plot(tree.fit)
+text(tree.fit, pretty=0)
+zm()
 ```
 ### Decision tree test
 
@@ -263,6 +279,56 @@ test.error <- mean(tree.predtest != test$NObeyesdad)
 print(paste("Misclassification error rate in train = ", train.error))
 print(paste("Misclassification error rate in test = ", test.error))
 ```
+
+```{r}
+library(caret)
+confusionMatrix(tree.predtest, 
+                as.factor(test$NObeyesdad))
+
+confusionMatrix(tree.predtrain, 
+                as.factor(train$NObeyesdad))
+```
+```{r}
+best_cp <- tree.fit$cptable[which.min(tree.fit$cptable[, "xerror"]), "CP"]
+best_cp
+```
+```{r}
+tree.fit$cptable
+```
+### Pruning
+
+```{r}
+tree.prune <- prune(tree.fit, cp = 0.03)
+tree.prune
+
+```
+```{r}
+plot(tree.prune)
+text(tree.prune, pretty=0)
+zm()
+```
+```{r}
+# Train Test set prediction result
+
+tree.predtrain <- predict(tree.prune, train, type = "class")
+tree.predtest <- predict(tree.prune, test, type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+```{r}
+confusionMatrix(tree.predtest, 
+                as.factor(test$NObeyesdad))
+
+confusionMatrix(tree.predtrain, 
+                as.factor(train$NObeyesdad))
+```
+
+
+### BMI
 
 ```{r}
 
@@ -299,10 +365,38 @@ print(paste("Misclassification error rate in test = ", test.error))
 Adding new feature 'BMI' decreased the misclassification error rate in test data from 16.6% to 3.6%.
 
 ```{r}
-# Confusion matrix
-table(tree.predtrain, train$NObeyesdad)
-table(tree.predtest, test$NObeyesdad)
+plot(tree.fit)
+text(tree.fit, pretty = 0)
+zm()
 ```
+
+
+
+```{r}
+# Confusion matrix
+confusionMatrix(tree.predtrain, as.factor(train$NObeyesdad))
+confusionMatrix(tree.predtest, as.factor(test$NObeyesdad))
+```
+
+```{r}
+library(pROC)
+
+p1 <- predict(tree.fit, test, type = 'prob')
+p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
 
 ```{r}
 
@@ -321,20 +415,134 @@ print(paste("Misclassification error rate in test = ", test.error))
 ```
 Only with BMI predictor, the model performs pretty good.
 
+```{r}
+plot(tree.fit)
+text(tree.fit,pretty=0)
+zm()
+```
 
 # SVM Modeling
 
 ```{r}
 library(e1071)
-
 train$CALC <- as.numeric(as.character(train$CALC))
 
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "radial")
+summary(svm.fit)
+```
+
+
+```{r}
+library(e1071)
+set.seed(4)
+train$CALC <- as.numeric(as.character(train$CALC))
+test$CALC <- as.numeric(as.character(test$CALC))
+
  svm1 <- svm(NObeyesdad~., data=train, 
-          type="C-classification", kernal="radial", 
-          gamma=0.1, cost=5)
+          type="C-classification", 
+          kernal="radial")
  
  summary(svm1)
 ```
+```{r}
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+```
+```{r}
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+```
+```{r}
+library(pROC)
+
+p1 <- predict(svm.fit, test, type = 'prob')
+#p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+```{r}
+roc_svm_test <- roc(response = test$NObeyesdad, predictor =as.numeric(test.pred))
+plot(roc_svm_test, add = TRUE,col = "red", print.auc=TRUE, print.auc.x = 0.5, print.auc.y = 0.3)
+legend(0.3, 0.2, legend = c("test-svm"), lty = c(1), col = c("blue"))
+```
+
+
+## SVM Radial
+
+```{r}
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "radial")
+
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+
+```
+
+## SVM Linear
+```{r}
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "linear")
+
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+```
+## SVM Polynomial
+
+```{r}
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "polynomial", degree=2)
+
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+
+```
+```{r}
+plot(svm.fit, test)
+```
+
+
+
 
 
 
@@ -363,22 +571,24 @@ print(paste("Misclassification error rate in test = ", round(svm.test.error,4),"
 
 ```
 ```{r}
-plot(svm1,test,Age~Height)
+plot(svm1,test,Age~BMI)
 ```
-#Tuning SVM
+
+# Tuning SVM
 ```{r}
 train$NObeyesdad <- as.factor(train$NObeyesdad)
-tune.svm <- tune(svm, NObeyesdad~., data=train, kernel="radial",type="C-classification",ranges=list(cost=2^(-3:2),gamma=2^(-25:1)),
-              tunecontrol = tune.control(nrepeat = 5, sampling = "cross", cross = 5))
+tune.svm <- tune(svm, NObeyesdad~., data=train, kernel="radial",type="C-classification",ranges=list(cost=2^(-3:2),gamma=2^(-25:1)), tunecontrol = tune.control(nrepeat = 5, sampling = "cross", cross = 5))
 ```
-#Best model parameters
+
+# Best model parameters
 ```{r}
 print(paste("Model Parameters: best cost value:", tune.svm$best.parameters[1]))
 print(paste("Model Parameters: best gamma value:", tune.svm$best.parameters[2]))
 
 ```
-#Training on best params
+## Training on best params
 ```{r}
+
 svm.bestparam <- svm(NObeyesdad~., 
                      data=train, 
                      type="C-classification", 
@@ -388,6 +598,7 @@ svm.bestparam <- svm(NObeyesdad~.,
                      )
  
  summary(svm.bestparam)
+ 
 ```
 ```{r}
 #training prediction
@@ -421,14 +632,14 @@ options(warn=-1)
 library(ipred)
 library(randomForest)
 
-train1<-train
+#train1<-train
 
-train1$NObeyesdad <- mapvalues(train1$NObeyesdad,
+train1$NObeyesdad <- mapvalues(train$NObeyesdad,
                             from=c(0, 1, 2, 3, 4, 5, 6),
           to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
                  "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
 
-gbag <- bagging(as.factor(NObeyesdad) ~ ., data = train1,coob=T,nbag=100)
+gbag <- bagging(as.factor(NObeyesdad) ~ ., data = train,coob=T,nbag=100)
 print(gbag)
 
 
@@ -489,7 +700,8 @@ barplot(VI_plot$Overall,
 
 library(gbm)
 
-options(warn=-1)
+#options(warn=-1)
+train['CALC'] <- sapply(train['CALC'], as.numeric)
 
 boost <- gbm(
   NObeyesdad ~ ., 
@@ -577,20 +789,57 @@ print(paste("SVM error = ", svm.error))
 print(paste("Tree error = ", tree.error))
 ```
 
-# Ensemble
+# Stacking
 
 ```{r}
-new_df <- data.frame(svm.predtrain, tree.predtrain, train$NObeyesdad)
+# Train
+new_df <- data.frame(train.pred, tree.predtrain, train$NObeyesdad)
 entree.fit <- rpart(train.NObeyesdad ~ . , data = new_df)
 
 entree.pred <- predict(entree.fit, new_df, type = "class")
 entree.error <- mean(entree.pred != new_df$train.NObeyesdad)
 
 print(paste("Ensemble tree error = ", entree.error))
+confusionMatrix(entree.pred, as.factor(train$NObeyesdad))
+```
+
+```{r}
+new_df <- data.frame(test.pred, tree.predtest, test$NObeyesdad)
+entree.fit <- rpart(test.NObeyesdad ~ . , data = new_df)
+
+entree.pred <- predict(entree.fit, new_df, type = "class")
+entree.error <- mean(entree.pred != new_df$test.NObeyesdad)
+
+print(paste("Ensemble tree error = ", entree.error))
+confusionMatrix(entree.pred, as.factor(test$NObeyesdad))
+```
+
+```{r}
+library(zoom)
+plot(entree.fit)
+text(entree.fit, pretty =0)
+zm()
 ```
 
 
+```{r}
+library(pROC)
 
+p1 <- predict(entree.fit, test, type = 'prob')
+p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
 
 
 
