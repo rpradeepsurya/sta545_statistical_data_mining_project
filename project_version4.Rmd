@@ -780,6 +780,69 @@ importance(rf.fit)
 
 ```
 
+```{r}
+set.seed(545)
+library(randomForest)
+
+set.seed(1)
+bestmtry_Height <-tuneRF(sapply(train, as.numeric),sapply(train$Height, as.numeric),improve = 0.01, stepFactor = 1.5, ntree=5000, trace = TRUE, plot = TRUE)
+print(bestmtry_Height)
+```
+
+```{r}
+
+rf.fit_Height <- randomForest(
+  Weight ~ Age , 
+  data = sapply(train, as.numeric),
+  importance = TRUE,
+  mtry = 21,
+  ntree = 500
+)
+
+rf.pred_Hei <- predict(rf.fit_Height, train, type='class')
+rf.predtest_Hei <- predict(rf.fit_Height, test, type='class')
+
+print("--- Training Error - Random Forest ---")
+print(mean(round(rf.pred_Hei) != train$Height))
+
+print("--- Test Error - Random Forest ---")
+print(mean(round(rf.predtest_Hei) != test$Height))
+
+rf.fit_Height
+varImpPlot(rf.fit_Height)
+```
+
+```{r}
+set.seed(545)
+library(randomForest)
+
+set.seed(1)
+bestmtry_Age <-tuneRF(sapply(train, as.numeric),sapply(train$Age, as.numeric),improve = 0.01, stepFactor = 1.5, ntree=5000, trace = TRUE, plot = TRUE)
+print(bestmtry_Age)
+```
+
+```{r}
+rf.fit_Age <- randomForest(
+  Age ~ Weight+Height, 
+  data = sapply(train, as.numeric),
+  importance = TRUE,
+  mtry = 22,
+  ntree = 500
+)
+
+rf.pred_Age <- predict(rf.fit_Age, train, type='class')
+rf.predtest_Age <- predict(rf.fit_Age, test, type='class')
+
+print("--- Training Error - Random Forest ---")
+print(mean(round(rf.pred_Age) != train$Age))
+
+print("--- Test Error - Random Forest ---")
+print(mean(round(rf.predtest_Age) != test$Age))
+
+rf.fit_Age
+varImpPlot(rf.fit_Age)
+```
+
 
 ```{r}
 svm.error <- mean(svm.predtrain != train$NObeyesdad)
