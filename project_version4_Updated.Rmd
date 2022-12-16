@@ -8,10 +8,35 @@ output: pdf_document
 extra_dependencies: ['amsmath', 'someotherpackage']
 ---
 
+Abstract:
 
 Contributions of the Team Members
 
 Priyanka Bhoite : 
+
+Data Cleaning & Preparation
+
+Exploratory Data Analysis
+1 - Analysis of Target Variable Distribution
+2 - Analyzing Distributions of Numeric Variables
+3 - Analyzing the categorical data and count
+4 - Relationship between Weight & Height for both genders
+
+Modeling - Support Vector Machines & Bagging (for dataset with BMI)
+Support Vector Machines & Bagging (for dataset without BMI)
+
+PradeepSurya
+
+Data Cleaning & Preparation
+Data Encoding
+Replacing categorical values of target variable to numeric
+
+Modeling
+
+
+
+Conclusion 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 set.seed(42)
@@ -59,10 +84,10 @@ data$TUE <- round(data$TUE) # Round off the column to integer
 ```
 
 
-
+# Analyzing the target variable
 
 ```{r}
-# Analyzing the target variable
+
 library(tidyverse)
 
 obesity.level <- data$NObeyesdad
@@ -80,7 +105,7 @@ The above bar graph and the distribution of the data shows that Obesity_Type_I i
 
 
 
-- Analyzing the distribution of the numerical variables
+# Analyzing the distribution of the numerical variables
 ```{r}
 for (var in num.cols) {
   #col <- eval(as.name(paste(var)))
@@ -98,7 +123,7 @@ data %>% count(data[['Gender']]) %>% print()
 ```
 
 
-Analyzing the categorical data and count
+# Analyzing the categorical data and count
 
 ```{r}
 # Categorical predictors count
@@ -131,7 +156,7 @@ xlab="Smokes?",ylab = "Number of Respondents", col=c("blue","red"))
 
 
 ```
-Relationship between weight & height specifically , since they are used in calculating BMI
+# Relationship between weight & height specifically , since they are used in calculating BMI
 
 Filtering the data based on genders
 
@@ -636,14 +661,14 @@ options(warn=-1)
 library(ipred)
 library(randomForest)
 
-#train1<-train
+train1<-train
 
 train1$NObeyesdad <- mapvalues(train$NObeyesdad,
                             from=c(0, 1, 2, 3, 4, 5, 6),
           to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
                  "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
 
-gbag <- bagging(as.factor(NObeyesdad) ~ ., data = train,coob=T,nbag=100)
+gbag <- bagging(as.factor(NObeyesdad) ~ ., data = train1,coob=T,nbag=100)
 print(gbag)
 
 
@@ -1025,3 +1050,86 @@ confusionMatrix(test.pred, as.factor(test_new$NObeyesdad))
 ```
 After eliminating the BMI & Weight predictor , the linear kernal svm train error increased from 10.4% to 35.3% and the test error increased from 10.85 to 40%.
 For radial kernal svm, the train dataset error increased from 8.39% to 24.89% and test error increased from 11.61% to 30.85%.
+
+Calculating variable importance in SVM
+
+```{r}
+library(rminer)
+train_new$NObeyesdad<-as.numeric(train_new$NObeyesdad)
+model<- fit(NObeyesdad~.,data = train_new, model ="svm", kpar= list(sigma=0.1), C=2)
+svm.imp<- Importance(model,data=train_new)
+svm.imp$imp
+```
+
+
+# Bagging model with the updated data
+
+```{r}
+options(warn=-1)
+
+library(ipred)
+library(randomForest)
+
+train1_new<-train_new
+
+train1_new$NObeyesdad <- mapvalues(train1_new$NObeyesdad,
+                            from=c(0, 1, 2, 3, 4, 5, 6),
+          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
+
+gbag_new <- bagging(as.factor(NObeyesdad) ~ ., data = train1_new,coob=T,nbag=100)
+print(gbag_new)
+```
+The Out-of-bag estimate error increased from 4% to 19.55% by elimating BMI & Weight from the dataset
+
+
+```{r}
+bag.predtrain_new <- predict(gbag_new, train1_new)
+xtab.train <- table(train_new$NObeyesdad, bag.predtrain_new)
+print("Confussion matrix for train data")
+xtab.train
+
+#test prediction
+test1_new<-test_new
+test1_new$NObeyesdad <- mapvalues(test1_new$NObeyesdad,
+                            from=c(0, 1, 2, 3, 4, 5, 6),
+          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
+
+bag.predtest_new <- predict(gbag_new, test1_new)
+xtab.test <- table(test_new$NObeyesdad, bag.predtest_new)
+print("Confussion matrix for test data")
+xtab.test
+```
+
+
+```{r}
+bag.train.error_new <- mean(bag.predtrain_new != train1_new$NObeyesdad)
+bag.test.error_new <- mean(bag.predtest_new != test1_new$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ",round(bag.train.error_new,4),"%"))
+print(paste("Misclassification error rate in test = ", round(bag.test.error_new,4),"%"))
+
+```
+The misclassification error in test data increased from 3% to 18% with the new dataset.
+
+
+Feature Importance
+```{r}
+#calculate variable importance
+varimp.data_new <- subset(train1_new, select=-c(NObeyesdad))
+VI <- data.frame(var=names(varimp.data_new), imp=varImp(gbag_new))
+
+#sort variable importance descending
+VI_plot <- VI[order(VI$Overall, decreasing=TRUE),]
+
+#visualize variable importance with horizontal bar plot
+barplot(VI_plot$Overall,
+        names.arg=rownames(VI_plot),
+        horiz=FALSE,
+        col='steelblue',
+        xlab='Variable Importance',
+        las=2,
+        srt=45)
+```
+After eliminating Weight & BMI predictors, Age, Height NCP (Consumption of high calorific food) are highly correlated with the predictor variable
