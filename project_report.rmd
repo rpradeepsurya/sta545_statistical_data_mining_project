@@ -1,0 +1,14 @@
+---
+title: "STA545 Statistical Data Mining I Project"
+author: |
+    | Estimation of Obesity levels
+    | Team: 16
+date: "`r Sys.Date()`"
+output: pdf_document
+extra_dependencies: ['amsmath', 'someotherpackage']
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(42)
+```
