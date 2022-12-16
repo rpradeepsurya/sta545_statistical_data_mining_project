@@ -1236,3 +1236,34 @@ plot.roc(r1,
          main= 'ROC Curve')
 ```
 
+# Boosting - without Weight and BMI
+
+```{r}
+#Boosting (gbm)
+
+#options(warn=-1)
+train_new['CALC'] <- sapply(train_new['CALC'], as.numeric)
+
+boost <- gbm(
+  NObeyesdad ~ ., 
+  data = train_new, 
+  distribution = "multinomial",
+  n.trees = 50,
+  #interaction.depth = 4
+)
+print(boost)
+```
+
+```{r}
+#training prediction
+gbm.predtrain <- predict(boost, train_new)
+
+#test prediction
+gbm.predtest <- predict(boost, test_new)
+
+gbm.train.error <- mean(gbm.predtrain != train_new$NObeyesdad)
+gbm.test.error <- mean(gbm.predtest != test_new$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", gbm.train.error,"%"))
+print(paste("Misclassification error rate in test = ", gbm.test.error,"%"))
+```
