@@ -1237,6 +1237,77 @@ plot.roc(r1,
          print.thres=TRUE,
          main= 'ROC Curve')
 ```
+# Bagging model with the updated data
+
+```{r}
+options(warn=-1)
+set.seed(545)
+
+train1_new<-train_new
+
+train1_new$NObeyesdad <- mapvalues(train1_new$NObeyesdad,
+                            from=c(0, 1, 2, 3, 4, 5, 6),
+          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
+
+gbag_new <- bagging(as.factor(NObeyesdad) ~ ., data = train1_new,coob=T,nbag=40)
+print(gbag_new)
+```
+The Out-of-bag estimate error increased from 4% to 19.23% by eliminating BMI & Weight from the dataset.
+
+
+```{r}
+bag.predtrain_new <- predict(gbag_new, train1_new)
+xtab.train <- table(train_new$NObeyesdad, bag.predtrain_new)
+print("Confussion matrix for train data")
+xtab.train
+
+#test prediction
+test1_new<-test_new
+test1_new$NObeyesdad <- mapvalues(test1_new$NObeyesdad,
+                            from=c(0, 1, 2, 3, 4, 5, 6),
+          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
+
+bag.predtest_new <- predict(gbag_new, test1_new)
+xtab.test <- table(test_new$NObeyesdad, bag.predtest_new)
+print("Confussion matrix for test data")
+xtab.test
+```
+
+
+```{r}
+bag.train.error_new <- mean(bag.predtrain_new != train1_new$NObeyesdad)
+bag.test.error_new <- mean(bag.predtest_new != test1_new$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ",round(bag.train.error_new,4),"%"))
+print(paste("Misclassification error rate in test = ", round(bag.test.error_new,4),"%"))
+
+```
+The misclassification error in test data increased from 3% to 18% with the new dataset.
+
+
+Feature Importance
+```{r}
+#calculate variable importance
+varimp.data_new <- subset(train1_new, select=-c(NObeyesdad))
+VI <- data.frame(var=names(varimp.data_new), imp=varImp(gbag_new))
+
+#sort variable importance descending
+VI_plot <- VI[order(VI$Overall, decreasing=TRUE),]
+
+#visualize variable importance with horizontal bar plot
+barplot(VI_plot$Overall,
+        names.arg=rownames(VI_plot),
+        horiz=FALSE,
+        col='steelblue',
+        xlab='Variable Importance',
+        las=2,
+        srt=45)
+```
+After eliminating Weight & BMI predictors, Age, Height NCP (Consumption of high calorific food) are highly correlated with the predictor variable
+
+
 
 # Boosting - without Weight and BMI
 
