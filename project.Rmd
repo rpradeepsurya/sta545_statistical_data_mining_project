@@ -1,0 +1,1564 @@
+---
+title: "STA545 Statistical Data Mining I Project"
+author: |
+    | Estimation of Obesity levels
+    | Priyanka Bhoite  Akhilesh Nampalli  Pradeepsurya Rajendran
+    | Team 16
+date: "`r Sys.Date()`"
+output: pdf_document
+extra_dependencies: ['amsmath', 'someotherpackage']
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(42)
+```
+
+# Abstract
+
+Obesity is a serious public health issue that affects a large portion of
+global population. It is contributed by various lifestyle factors, which
+if analyzed correctly can control obesity levels. In this project, the
+dataset containing data for the estimation of obesity levels in
+individuals from the countries of Mexico, Peru and Colombia, based on
+their eating habits and physical condition was analyzed. Different
+statistical analysis, visualization techniques and preprocessing were
+performed to derive insights from the data. Moreover, different
+supervised learning algorithms/methods such as Decision Tree, Support
+Vector Machine, Random Forest, and Bagging were fitted to the data and
+the relationship of predictors with the response was studied. The
+results show that Weight and BMI are the most influential predictors
+followed by Vegetable consumption and Age. Stacked models resulted in
+the lowest misclassification error rate of 2.5%.
+
+# Introduction:
+
+Obesity is a major public health and economic problem of global
+significance. The problem statement includes understanding the dataset
+and building a predictive model that is capable of classifying someone
+into different health categories like obese or normal (health ) range.
+The analysis and modeling of this dataset would give us the relationship
+between a person's eating habits, physical activity level , lifestyle
+and the body fat levels. More than any other time in the past few years,
+the current Covid 19 epidemic has demonstrated the value of leading a
+healthy lifestyle.
+
+# Data Description:
+
+This dataset include data for the estimation of obesity levels in
+individuals based on their eating habits and physical condition. The
+data contains 17 attributes and 2111 records, the records are labeled
+with the class variable NObesity (Obesity Level), that allows
+classification of the data using the values of Insufficient Weight,
+Normal Weight, Overweight Level I, Overweight Level II, Obesity Type I,
+Obesity Type II and Obesity Type III.
+
+Attributes related to eating habits: Frequent consumption of high
+caloric food (FAVC), Frequency of consumption of vegetables (FCVC),
+Number of main meals (NCP), Consumption of food between meals (CAEC),
+Consumption of water daily (CH20), and Consumption of alcohol(CALC).
+
+The attributes related with the physical condition are: Calories
+consumption monitoring (SCC), Physical activity frequency (FAF), Time
+using technology devices (TUE), Transportation used (MTRANS), other
+variables obtained were: Gender, Age, Height and Weight
+
+# Materials & Methods:
+
+-Importing data -Data Cleaning & Data Preparation -Exploratory Data
+Analysis -Data Encoding -Correlation of Variables -Decision Tree
+Modelling:with BMI -Bagging: with BMI -Random Forest:with BMI -SVM:with
+BMI -Decision tree: without BMI -SVM:without BMI -Bagging:without BMI
+-Random Forest-:without BMI
+
+### Importing Packages
+
+```{r}
+library(tidyverse)
+library(easyreg)
+library(tidyverse)
+library(dplyr)
+library(plyr)
+library(caret)
+library(PerformanceAnalytics)
+library(rpart)
+library(rpart.plot)
+library(zoom)
+library(pROC) # ROC curve
+library(e1071) # SVM
+library(ipred)
+library(randomForest)
+library(gbm)
+
+```
+
+### Importing data
+
+```{r}
+# importing dataset - csv file
+
+data <- read.csv("ObesityData.csv")
+#data
+summary(data)
+```
+
+### Data Cleaning & Data Preparation
+
+```{r}
+# Checking for null values
+any(is.na(data))
+```
+
+Dataset doesn't contain any null values.
+
+```{r}
+# Numeric predictors
+num.cols <- c("Age", "Height", "Weight")
+
+# Categorical Predictors
+cat.cols <- c("Gender", "family_history_with_overweight", "FAVC", "FCVC",
+              "NCP", "CAEC", "SMOKE", "CH2O", "SCC", "FAF", "TUE", "CALC",
+              "MTRANS")
+```
+
+Rounding categorical variables like 'NCP','FCVC','CH20','FAF','TUT'
+
+```{r}
+data$FCVC <- round(data$FCVC) # Round off the column to integer
+data$NCP <- round(data$NCP) # Round off the column to integer
+data$CH2O <- round(data$CH2O) # Round off the column to integer
+data$FAF <- round(data$FAF) # Round off the column to integer
+data$TUE <- round(data$TUE) # Round off the column to integer
+
+#unique(data[("FCVC")])
+```
+
+### Exploratory Data Analysis
+
+1- Analyzing the target variable
+
+```{r}
+# Analyzing the target variable
+obesity.level <- data$NObeyesdad
+
+ggplot(data = data, aes(x=obesity.level)) + geom_bar(stat='count') + 
+  stat_count(geom = "text", colour = "white", size = 3.5, aes(label = ..count..), position=position_stack(vjust=0.5))
+```
+
+The above bar graph and the distribution of the data shows that
+Obesity_Type_I is the most common among the respondents and
+Insufficient_Weight is the least common one
+
+2- Data Summary
+
+```{r}
+summary(data)
+```
+
+3- Distribution of Weight, Age and Height of all the respondents?
+
+```{r}
+for (var in num.cols) {
+  #col <- eval(as.name(paste(var)))
+  print(ggplot(data, aes(x=eval(as.name(paste(var))),y=after_stat(density))) + xlab(var) +
+  geom_histogram(position='dodge', binwidth=1, fill="#FF9999", color="#e9ecef") +
+  geom_density(alpha=0.25))
+}
+
+```
+
+The weight data is almost bimodal and has an average around the 80kg
+mark, while the height data has more of a symmetric, normal curve and
+has an average around the 1.7 meters mark.
+
+4-Analyzing the categorical data and count
+
+```{r}
+# Categorical predictors count
+for (var in cat.cols) {
+  #print(var)
+  count(data[var]) %>% print()
+}
+
+```
+
+5-How are respondents responding to yes/no questions?
+
+```{r}
+
+counts <- table(data$family_history_with_overweight)
+barplot(counts, main="Number of Respondents with Family History of Overweightness",
+xlab="family_history_of_overweightness",col=c("blue","red"))
+
+counts_1 <- table(data$FAVC)
+barplot(counts, main="Number of Respondents that Frequently Consume High Caloric Food",
+xlab="High-Calorie Food Consumption?",ylab = "Number of Respondents", col=c("blue","red"))
+
+counts_2 <- table(data$SCC)
+barplot(counts, main="Number of Respondents that Monitor Calorie Consumption",
+xlab="Calorie Consumption Monitoring?",ylab = "Number of Respondents", col=c("blue","red"))
+
+counts_3 <- table(data$SMOKE)
+barplot(counts, main="Number of Respondents that Smoke",
+xlab="Smokes?",ylab = "Number of Respondents", col=c("blue","red"))
+
+
+```
+
+Approx 98% of all respondents said "yes" to smoking, 81.76% responded
+yes to family history of being overweight, 88.35% responded yes to
+consumption of high calorific food (FAVC),95.4% said they don't monitor
+their calorie consumption.
+
+6-Relationship between weight & height specifically , since they are
+used in calculating BMI Filtering the data based on genders
+
+```{r}
+# Male data
+library(easyreg)
+data1 = data.frame(filter(data,Gender == 'Male'))
+#data %>% filter()
+data1=data.frame(data1$Weight,data1$Height)
+#regplot(data1,model=1,digits=3, position=3, ylab="height", xlab="weight",col="red",
+#        main = "Relationship between Weight & Height for Females")
+
+
+```
+
+```{r}
+# Female data
+
+data2=data.frame(filter(data,Gender == "Female"))
+#data %>% filter()
+data2=data2[c("Weight","Height")]
+#regplot(data2,model=1,digits=3, position=3, ylab="height", xlab="weight",col="red",
+ #       main = "Relationship between Weight & Height for Females")
+
+```
+
+This graph shows us there is a trending upwards relationship between
+weight and height with both genders, with the regression line for
+females slightly steeper than that of males, meaning that the same
+increase in weight for females corresponds to a slightly larger increase
+in height. We can also see that data points corresponding to weights of
+male are more clustered than females.
+
+### Categorical Data Encoding
+
+```{r}
+# Encoding categorical to numeric
+dat <- cbind(data)
+
+# Label encoding categorical predictors with two levels into binary 
+dat$Gender <- ifelse(dat$Gender == "Male", 1, 0)
+dat$FAVC <- ifelse(dat$FAVC == "yes", 1, 0)
+dat$SMOKE <- ifelse(dat$SMOKE == "yes", 1, 0)
+dat$SCC <- ifelse(dat$SCC == "yes", 1, 0)
+#dat$CALC <- ifelse(dat$CALC == "yes", 1, 0)
+dat$CALC <- mapvalues(dat$CALC, 
+          from=c("Always", "Frequently","Sometimes","no"), 
+          to=c(4,3,2,1))
+
+dat$family_history_with_overweight <- ifelse(dat$family_history_with_overweight == "yes", 1, 0)
+
+```
+
+2 - One hot encoding categorical predictors with more than two levels
+
+```{r}
+# 
+
+one.hot <- dummyVars(~ CAEC + MTRANS, data = dat, fullRank = T)
+dat_encoded <- data.frame(predict(one.hot, newdata = dat))
+
+```
+
+3-Replacing categorical values in response column with numeric values
+
+```{r}
+# Ordinal Encoding
+dat$NObeyesdad <- mapvalues(dat$NObeyesdad, 
+          from=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"), 
+          to=c(0, 1, 2, 3, 4, 5, 6))
+```
+
+```{r}
+
+# merging data frame
+
+data.final <- cbind(dat, dat_encoded)
+
+data.final <- data.final[,-9]
+data.final <- data.final[,-15]
+
+#data.final <- select(data.final, -CAEC, -MTRANS)
+```
+
+### Correlation of Variables
+
+```{r}
+library(PerformanceAnalytics)
+
+# converting datatype to numeric
+df <- sapply(data.final, as.numeric)
+
+chart.Correlation(df[,c('Age', 'Height', 'Weight', 'NObeyesdad')], histogram=TRUE, pch=19)
+```
+
+### Predictive Models
+
+## Train Test Stratified Split (75-25)
+
+```{r}
+# train test split
+set.seed(545)
+# stratified split; train: 75%, test: 25%
+indices <- createDataPartition(data.final$NObeyesdad, p = 0.75, list = FALSE)
+
+train <- data.final[indices,]
+test <- data.final[-indices,]
+```
+
+## Decision Tree
+
+Decision trees use a divide-and-conquer approach to make predictions.
+The goal is to split the training data into subsets based on certain
+features, with each split resulting in a more homogeneous subset. The
+splits are chosen to maximize the subsets' homogeneity, with the
+ultimate goal of producing leaf nodes that are as pure as possible,
+meaning that they contain a single class label. To measure the
+homogeneity of a subset, decision trees use impurity measures such as
+entropy or misclassification error or the Gini index.
+
+These measures calculate the degree of disorderness or randomness in the
+data. If the data is completely pure, the impurity measure will be 0.
+The impurity measure will be maximal if the data is equally distributed
+among different classes.
+
+At each step in the tree-building process, the algorithm selects the
+feature and the split point that result in the lowest impurity of the
+subsets. The process continues until the leaf nodes are pure or until a
+pre-specified stopping criterion is reached.
+
+The primary reason for choosing a Decision tree as the base model is the
+ease of interpretation and also to have a better understanding of the
+predictors that better splits the response variable. Moreover, the tree
+is robust to outliers and will not produce a biased result.
+
+```{r}
+# Decision Tree
+
+#train.df <- data.frame(sapply(train, as.numeric))
+#train.df['NObeyesdad'] <- data['NObeyesdad']
+
+tree.fit <- rpart(NObeyesdad ~ . , data = train, method='class')
+tree.fit
+tree.fit$variable.importance
+```
+
+```{r}
+
+plot(tree.fit)
+text(tree.fit, pretty=0)
+#zm()
+```
+
+In the fitted decision tree, Weight was identified as the most
+significant predictor that best splits the response variable.
+Additionally, Gender, Height, Age, FAVC were also selected in
+classifying the input values. As per the constructed tree, if the
+persons weigh more than 100 kg and are male, they are more likely to
+have Obesity type III. If the persons weigh less than 61 kg, they are
+more likely to be in Insufficient weight category. The tree contains 14
+terminal nodes. The complexity of the tree can be reduced by pruning.
+
+```{r}
+# Decision tree Train Test set prediction result
+
+tree.predtrain <- predict(tree.fit, train, type = "class")
+tree.predtest <- predict(tree.fit, test, type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+
+```{r}
+
+confusionMatrix(tree.predtest, 
+                as.factor(test$NObeyesdad))
+
+confusionMatrix(tree.predtrain, 
+                as.factor(train$NObeyesdad))
+```
+
+```{r}
+best_cp <- tree.fit$cptable[which.min(tree.fit$cptable[, "xerror"]), "CP"]
+best_cp
+```
+
+```{r}
+tree.fit$cptable
+```
+
+### Pruning
+
+In Decision Tree, pruning is a technique that removes parts of the tree
+that seems to be redundant in classifying the response categories. Thus,
+it reduces the complexity of the tree based on the cross validation
+error.
+
+```{r}
+tree.prune <- prune(tree.fit, cp = best_cp)
+tree.prune
+
+```
+
+```{r}
+plot(tree.prune)
+text(tree.prune, pretty=0)
+#zm()
+```
+
+```{r}
+# Train Test set prediction result
+
+tree.predtrain <- predict(tree.prune, train, type = "class")
+tree.predtest <- predict(tree.prune, test, type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+
+Pruning didn't reduce the tree complexity without increasing the
+misclassification error rate in both train and test. Based on the cross
+validation error, the tree was pruned but it increased the
+misclassification error rate from 15% to 27% in train data and from 17%
+to 29% in the test data.
+
+```{r}
+confusionMatrix(tree.predtest, 
+                as.factor(test$NObeyesdad))
+
+confusionMatrix(tree.predtrain, 
+                as.factor(train$NObeyesdad))
+```
+
+### Feature Engineering - BMI
+
+Creating a new feature BMI from Weight and Height predictors. Feature
+engineering can improve the performance of the model.
+
+```{r}
+
+# Adding new feature BMI (weight/(height^2))
+
+train <- transform(train, BMI=Weight/(Height^2))
+test <- transform(test, BMI=Weight/(Height^2))
+
+```
+
+```{r}
+
+df <- sapply(train, as.numeric)
+
+chart.Correlation(df[,c('Age', 'Height', 'Weight', 'BMI', 'NObeyesdad')], 
+                  histogram=TRUE, pch=19)
+```
+
+BMI can clearly separate the 7 categories of the response variable.
+
+### Decision Tree - data with BMI
+
+```{r}
+
+tree.fit <- rpart(NObeyesdad ~ . , data = train)
+
+tree.predtrain <- predict(tree.fit, train, type = "class")
+tree.predtest <- predict(tree.fit, test, type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+
+```
+
+Adding new feature 'BMI' decreased the misclassification error rate in
+test data from 16.6% to 3.6%.
+
+```{r}
+plot(tree.fit)
+text(tree.fit, pretty = 0)
+#zm()
+```
+
+```{r}
+# Confusion matrix
+confusionMatrix(tree.predtrain, as.factor(train$NObeyesdad))
+confusionMatrix(tree.predtest, as.factor(test$NObeyesdad))
+```
+
+```{r}
+
+p1 <- predict(tree.fit, test, type = 'prob')
+p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+```{r}
+
+# Only using BMI predictor
+
+tree.fit <- rpart(NObeyesdad ~ BMI , data = train)
+
+tree.predtrain <- predict(tree.fit, train['BMI'], type = "class")
+tree.predtest <- predict(tree.fit, test['BMI'], type = "class")
+
+train.error <- mean(tree.predtrain != train$NObeyesdad)
+test.error <- mean(tree.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+
+Only with BMI predictor, the model performs pretty good.
+
+```{r}
+plot(tree.fit)
+text(tree.fit,pretty=0)
+#zm()
+```
+
+## SVM Modeling
+
+The SVM algorithm finds the decision boundary by searching for the
+hyperplane that has the largest distance (also known as the margin) to
+the nearest points from each class. The points that are closest to the
+decision boundary and determine the position and orientation of the
+hyperplane are called support vectors. The SVM algorithm maximizes the
+margin by finding the hyperplane that has the largest distance to the
+nearest points from each class.
+
+In addition, we have also used SVM regularization parameters such as
+gamma and cost, which controls the balance between maximizing the margin
+and minimizing the number of support vectors which enhances the model
+performance to a new query point. The regularization parameter can be
+used to prevent overfitting.
+
+Moreover we developed 3 types of SVM Models based on predictors relation
+to the target variable. 1 - Linear SVM: Assuming the relationship
+between predictors and the target variable to be linear 2- Radial SVM:
+Assuming the relationship between predictors and the target variable to
+be non-linear but samples coming from or conforming to a normal
+distribution. 3- Polynomial SVM: Assuming the relationship between
+predictors and the target variable to be non-linear
+
+```{r}
+
+train$CALC <- as.numeric(as.character(train$CALC))
+
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "radial", probability=TRUE)
+summary(svm.fit)
+```
+
+```{r}
+
+set.seed(4)
+train$CALC <- as.numeric(as.character(train$CALC))
+test$CALC <- as.numeric(as.character(test$CALC))
+
+ svm1 <- svm(NObeyesdad~., data=train, 
+          type="C-classification", 
+          kernal="radial", probability=TRUE)
+ 
+ summary(svm1)
+```
+
+```{r}
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+```
+
+```{r}
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+```
+
+```{r}
+p1 <- predict(svm.fit, test, type="prob")
+roccurve <- plot(
+    roc(
+        response = test$NObeyesdad,
+        predictor = as.numeric(p1)
+    ),
+    legacy.axes = TRUE, 
+    print.auc=TRUE, 
+    auc.polygon=TRUE,
+    grid=c(0.1, 0.2),
+    grid.col=c("green", "red"),
+    max.auc.polygon=TRUE,
+    auc.polygon.col="lightblue",
+    print.thres=TRUE,
+    main = "ROC Curve"
+)
+
+```
+
+## SVM Radial - data with BMI
+
+```{r}
+
+train$CALC <- as.numeric(as.character(train$CALC))
+test$CALC <- as.numeric(as.character(test$CALC))
+
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "radial")
+
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+
+```
+
+```{r}
+p1 <- predict(svm.fit, test, type="prob")
+roccurve <- plot(
+    roc(
+        response = test$NObeyesdad,
+        predictor = as.numeric(p1)
+    ),
+    legacy.axes = TRUE, 
+    print.auc=TRUE, 
+    auc.polygon=TRUE,
+    grid=c(0.1, 0.2),
+    grid.col=c("green", "red"),
+    max.auc.polygon=TRUE,
+    auc.polygon.col="lightblue",
+    print.thres=TRUE,
+    main = "ROC Curve"
+)
+```
+
+## SVM Linear - data with BMI
+
+```{r}
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "linear")
+
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Linear kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Linear kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+```
+
+```{r}
+p1 <- predict(svm.fit, test, type="prob")
+roccurve <- plot(
+    roc(
+        response = test$NObeyesdad,
+        predictor = as.numeric(p1)
+    ),
+    legacy.axes = TRUE, 
+    print.auc=TRUE, 
+    auc.polygon=TRUE,
+    grid=c(0.1, 0.2),
+    grid.col=c("green", "red"),
+    max.auc.polygon=TRUE,
+    auc.polygon.col="lightblue",
+    print.thres=TRUE,
+    main = "ROC Curve"
+)
+```
+
+## SVM Polynomial - data with BMI
+
+```{r}
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "polynomial", degree=2)
+
+train.pred <- predict(svm.fit, train)
+test.pred <- predict(svm.fit, test)
+train.error <- mean(train.pred != train$NObeyesdad)
+test.error <- mean(test.pred != test$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test$NObeyesdad))
+
+```
+
+```{r}
+p1 <- predict(svm.fit, test, type="prob")
+roccurve <- plot(
+    roc(
+        response = test$NObeyesdad,
+        predictor = as.numeric(p1)
+    ),
+    legacy.axes = TRUE, 
+    print.auc=TRUE, 
+    auc.polygon=TRUE,
+    grid=c(0.1, 0.2),
+    grid.col=c("green", "red"),
+    max.auc.polygon=TRUE,
+    auc.polygon.col="lightblue",
+    print.thres=TRUE,
+    main = "ROC Curve"
+)
+```
+
+## Tuning SVM - Radial
+
+Tuning the hyperparameters of the SVM Model i.e. Gamma & Cost to get the
+best model parameters
+
+```{r}
+# Create data copy
+tune_data <- cbind(train)
+
+# SVM Tuning
+tune_data$NObeyesdad <- as.factor(tune_data$NObeyesdad)
+
+# Tuning took 4 hours to run. So, commenting for knitting the markdown file.
+#tune.svm <- tune(svm, NObeyesdad~., data=tune_data,
+                 #kernel="radial",type="C-classification",
+                 #ranges=list(cost=2^(-3:2),gamma=2^(-25:1)), 
+                 #tunecontrol = tune.control(nrepeat = 5, 
+                  #                          sampling = "cross",
+                  #                          cross = 5))
+```
+
+```{r}
+#Best model parameters
+
+#print(paste("Model Parameters: best cost value:", tune.svm$best.parameters[1]))
+#print(paste("Model Parameters: best gamma value:", tune.svm$best.parameters[2]))
+
+```
+
+Gamma and Cost value that resulted in the lowest cross validation error
+are 0.03125 and 4 respectively.
+
+Fitting SVM model using tuned hyperparameters.
+
+```{r}
+# SVM Radial - Tuned params
+svm.bestparam <- svm(NObeyesdad~., 
+                     data=tune_data, 
+                     type="C-classification", 
+                     kernal="radial", 
+                     gamma=0.03125, #tune.svm$best.parameters[2],
+                     cost=4 #as.numeric(tune.svm$best.parameters[1])
+                     )
+ 
+ summary(svm.bestparam)
+ 
+```
+
+```{r}
+#training prediction
+svm.bestparam.predtrain <- predict(svm.bestparam, train)
+xtab.train <- table(train$NObeyesdad, svm.bestparam.predtrain)
+print("Confussion matrix for train data")
+xtab.train
+
+#test prediction
+svm.bestparam.predtest <- predict(svm.bestparam,test)
+xtab.test <- table(test$NObeyesdad, svm.bestparam.predtest)
+print("Confusion matrix for test data")
+xtab.test
+```
+
+```{r}
+svm.bestparam.train.error <- mean(svm.bestparam.predtrain != train$NObeyesdad)
+svm.bestparam.test.error <- mean(svm.bestparam.predtest != test$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", round(svm.bestparam.train.error,4),"%"))
+print(paste("Misclassification error rate in test = ", round(svm.bestparam.test.error,4),"%"))
+```
+
+```{r}
+p1 <- predict(svm.bestparam, test, type="prob")
+roccurve <- plot(
+    roc(
+        response = test$NObeyesdad,
+        predictor = as.numeric(p1)
+    ),
+    legacy.axes = TRUE, 
+    print.auc=TRUE, 
+    auc.polygon=TRUE,
+    grid=c(0.1, 0.2),
+    grid.col=c("green", "red"),
+    max.auc.polygon=TRUE,
+    auc.polygon.col="lightblue",
+    print.thres=TRUE,
+    main = "ROC Curve"
+)
+```
+
+## Bagging
+
+Bagging is mainly focused on reducing the variance and minimizing the
+overfitting in the data. By using Bagging method we can predict the
+predicted errors in the dataset with the confusion matrix, which
+explains how variance can be manipulated by changing the original
+dataset. Initially we have considered 15 bootstrap samples i.e, 15
+samples and predicted the OOB error.With BMI included in the dataset the
+predictor variables are highly correlated to the response variable, so
+our results show the that we have a miscalssification error rate of
+2.59% which resembles the accuracy of data.
+
+```{r}
+#bagging
+set.seed(1)
+options(warn=-1)
+#train1<-train
+
+#train$NObeyesdad <- mapvalues(train$NObeyesdad,
+#                            from=c(0, 1, 2, 3, 4, 5, 6),
+#          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", #"Obesity_Type_II", "Obesity_Type_III", "Overweight_Level_I", #"Overweight_Level_II"))
+
+gbag <- bagging(as.factor(NObeyesdad) ~ ., 
+                data = train,
+                coob=T,
+                nbag=15)
+print(gbag)
+
+
+```
+
+```{r}
+#training prediction
+bag.predtrain <- predict(gbag, train)
+xtab.train <- table(train$NObeyesdad, bag.predtrain)
+print("Confussion matrix for train data")
+xtab.train
+
+#test prediction
+test1<-test
+#$NObeyesdad <- mapvalues(test1$NObeyesdad,
+#                            from=c(0, 1, 2, 3, 4, 5, 6),
+#          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", #"Obesity_Type_II", "Obesity_Type_III", "Overweight_Level_I", #"Overweight_Level_II"))
+
+bag.predtest <- predict(gbag, test1)
+xtab.test <- table(test$NObeyesdad, bag.predtest)
+print("Confussion matrix for test data")
+xtab.test
+
+```
+
+```{r}
+bag.train.error <- mean(bag.predtrain != train$NObeyesdad)
+bag.test.error <- mean(bag.predtest != test1$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", bag.train.error,"%"))
+print(paste("Misclassification error rate in test = ", bag.test.error,"%"))
+```
+
+Another importance of Bagging is to find the Important predictors thats
+affecting the increase in variance, such as in this case if we look at
+below graph, we can see BMI, weight and Gender are most important
+predictors.
+
+```{r}
+#calculate variable importance
+varimp.data <- subset(train, select=-c(NObeyesdad))
+VI <- data.frame(var=names(varimp.data), imp=varImp(gbag))
+
+#sort variable importance descending
+VI_plot <- VI[order(VI$Overall, decreasing=TRUE),]
+
+#visualize variable importance with horizontal bar plot
+barplot(VI_plot$Overall,
+        names.arg=rownames(VI_plot),
+        horiz=FALSE,
+        col='steelblue',
+        xlab='Variable Importance',
+        las=2,
+        srt=45)
+```
+
+## Random forest
+
+Random Forest Modelling is done to show an improvement in Bagging or
+boosting model. Random Forest Modelling with BMI shows how correlated
+are our predictors with response variable and with the outputs obtained
+we can see that OOB error is 2.3 % with mtry=15 which is obtained by
+tuning RF. From the VarIMpplot we can see that the variance is mostly
+affect by three top predictors BMI, Gender, weight.
+
+```{r}
+set.seed(1)
+bestmtry <-tuneRF(sapply(train, as.numeric),sapply(train$NObeyesdad, as.numeric),improve = 0.01, stepFactor = 1.5, ntree=5000, trace = TRUE, plot = TRUE)
+print(bestmtry)
+```
+
+```{r}
+set.seed(545)
+
+rf.fit <- randomForest(
+  NObeyesdad ~ ., 
+  data = sapply(train, as.numeric),
+  importance = TRUE,
+  mtry = 15,
+  ntree = 5000
+)
+
+rf.pred <- predict(rf.fit, train, type='class')
+rf.predtest <- predict(rf.fit, test, type='class')
+
+print("--- Training Error - Random Forest ---")
+print(mean(round(rf.pred) != train$NObeyesdad))
+
+print("--- Test Error - Random Forest ---")
+print(mean(round(rf.predtest) != test$NObeyesdad))
+
+rf.fit
+varImpPlot(rf.fit)
+importance(rf.fit)
+
+```
+
+We can notice that we have improved our model from bagging by using
+random forest model which reduced the OOB error from 2.59% to 2.28%.
+
+## Stacking (Decision Tree + SVM) --\> Decision Tree --\> Output
+
+Stacking, also known as a stacked generalization, is an ensemble
+learning technique that combines the predictions of multiple models to
+make a more accurate prediction. It involves training a learning
+algorithm to combine the predictions of several other learning
+algorithms. In stacking, the base models are trained on the original
+training dataset, and the outputs of the base models (predictions) are
+used as input to a higher level or meta-model, which is trained to make
+a final prediction. The decision tree and support vector machine (linear
+kernel) were used as base models in this project. The main idea behind
+stacking is that the base models may have different strengths and
+weaknesses, and by combining their predictions, we can obtain a more
+accurate overall prediction. Stacking can be a powerful technique, but
+it can also be computationally expensive since it requires training
+multiple models. It is often used in competitions where the goal is to
+achieve the highest possible prediction accuracy.
+
+There are several variations of stacking, including: • Homogeneous
+stacking: In this approach, all base models are the same type. •
+Heterogeneous stacking: In this approach, the base models are different
+types. • Single-level stacking: In this approach, only one meta-model
+combines the base models' predictions. • Multi-level stacking: In this
+approach, multiple levels of meta-models are used to combine the
+predictions of the base models. Here, single-level stacking with
+heterogenous base models was tried.
+
+```{r}
+# with BMI and weight
+train <- data.final[indices,]
+test <- data.final[-indices,]
+train <- transform(train, BMI=Weight/(Height^2))
+test <- transform(test, BMI=Weight/(Height^2))
+
+# Decision Tree
+tree.fit <- rpart(NObeyesdad ~ . , data = train)
+tree.predtrain <- predict(tree.fit, train, type = "class")
+tree.predtest <- predict(tree.fit, test, type = "class")
+
+train$CALC <- as.numeric(as.character(train$CALC))
+test$CALC <- as.numeric(as.character(test$CALC))
+
+# SVM
+svm.fit <- svm(NObeyesdad ~ ., data = train, 
+               type="C-classification",
+               kernel = "linear")
+
+svm.train.pred <- predict(svm.fit, train)
+svm.test.pred <- predict(svm.fit, test)
+
+
+new_df <- data.frame(svm.train.pred, tree.predtrain, train$NObeyesdad)
+entree.fit <- rpart(train.NObeyesdad ~ . , data = new_df)
+
+entree.pred <- predict(entree.fit, new_df, type = "class")
+entree.error <- mean(entree.pred != new_df$train.NObeyesdad)
+
+print(paste("Ensemble tree error (train) = ", entree.error))
+confusionMatrix(entree.pred, as.factor(train$NObeyesdad))
+```
+
+```{r}
+new_df <- data.frame(svm.test.pred, tree.predtest, test$NObeyesdad)
+entree.fit <- rpart(test.NObeyesdad ~ . , data = new_df)
+
+entree.pred <- predict(entree.fit, new_df, type = "class")
+entree.error <- mean(entree.pred != new_df$test.NObeyesdad)
+
+print(paste("Ensemble tree error (test) = ", entree.error))
+confusionMatrix(entree.pred, as.factor(test$NObeyesdad))
+```
+
+```{r}
+plot(entree.fit)
+text(entree.fit, pretty =0)
+#zm()
+```
+
+```{r}
+
+p1 <- predict(entree.fit, test, type = 'prob')
+p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+### Presentation Feedback
+
+Since BMI is a derived predictor from Weight & Height and has high
+correlation with the response variable, we were suggested to drop BMI
+and weight in order to analyze the influence of other predictors on the
+response variable. In the subsequent sub sections, without BMI and
+Weight predictors, different models were fitted to the data and their
+results were analyzed.
+
+## SVM Modeling (without Weight & BMI)
+
+```{r}
+
+set.seed(560)
+data_updated <- subset(data.final, select=-c(Weight))
+
+# stratified split; train: 75%, test: 25%
+indices_updated <- createDataPartition(data_updated$NObeyesdad, p = 0.75, list = FALSE)
+
+train_new <- data_updated[indices_updated,]
+test_new <- data_updated[-indices_updated,]
+```
+
+```{r}
+train_new$CALC <- as.numeric(as.character(train_new$CALC))
+
+svm_new.fit <- svm(NObeyesdad ~ ., data = train_new, 
+               type="C-classification",
+               kernel = "radial")
+summary(svm_new.fit)
+```
+
+```{r}
+set.seed(104)
+train_new$CALC <- as.numeric(as.character(train_new$CALC))
+test_new$CALC <- as.numeric(as.character(test_new$CALC))
+
+ svm1_new <- svm(NObeyesdad~., data=train_new, 
+          type="C-classification", 
+          kernal="radial")
+ 
+ summary(svm1_new)
+```
+
+```{r}
+train_new.pred <- predict(svm_new.fit, train_new)
+test_new.pred <- predict(svm_new.fit, test_new)
+train.error <- mean(train_new.pred != train_new$NObeyesdad)
+test.error <- mean(test_new.pred != test_new$NObeyesdad)
+print(paste("Train Error Rate (Radial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Radial kernel) = ", test.error*100, "%"))
+```
+
+```{r}
+confusionMatrix(train_new.pred, as.factor(train_new$NObeyesdad))
+confusionMatrix(test_new.pred, as.factor(test_new$NObeyesdad))
+```
+
+```{r}
+p1 <- predict(svm_new.fit, test_new, type = 'prob')
+#p1 <- p1[,2]
+r <- multiclass.roc(as.numeric(as.character(test_new$NObeyesdad)), as.numeric(p1), percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+```{r}
+roc_svm_test_new <- roc(response = test_new$NObeyesdad, predictor =as.numeric(test_new.pred))
+plot(roc_svm_test_new,
+     #add = TRUE,
+     col = "red", 
+     print.auc=TRUE, 
+     print.auc.x = 0.5, 
+     print.auc.y = 0.3
+     )
+legend(0.3, 0.2, legend = c("test-svm"), lty = c(1), col = c("blue"))
+```
+
+### SVM Linear
+
+```{r}
+svm.fit_linear <- svm(NObeyesdad ~ ., data = train_new, 
+               type="C-classification",
+               kernel = "linear")
+
+train.pred <- predict(svm.fit_linear, train_new)
+test.pred <- predict(svm.fit_linear, test_new)
+train.error <- mean(train.pred != train_new$NObeyesdad)
+test.error <- mean(test.pred != test_new$NObeyesdad)
+print(paste("Train Error Rate (Linear kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Linear kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train_new$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test_new$NObeyesdad))
+```
+
+```{r}
+p1 <- predict(svm.fit_linear, test_new, type = 'prob')
+#p1 <- p1[,2]
+r <- multiclass.roc(as.numeric(as.character(test_new$NObeyesdad)), as.numeric(p1), percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+### SVM Polynomial
+
+```{r}
+svm.fit_poly <- svm(NObeyesdad ~ ., data = train_new, 
+               type="C-classification",
+               kernel = "polynomial", degree=2)
+
+train.pred <- predict(svm.fit_poly, train_new)
+test.pred <- predict(svm.fit_poly, test_new)
+train.error <- mean(train.pred != train_new$NObeyesdad)
+test.error <- mean(test.pred != test_new$NObeyesdad)
+print(paste("Train Error Rate (Polynomial kernel) = ", train.error*100, "%"))
+print(paste("Test Error Rate (Polynomial kernel) = ", test.error*100, "%"))
+
+confusionMatrix(train.pred, as.factor(train_new$NObeyesdad))
+confusionMatrix(test.pred, as.factor(test_new$NObeyesdad))
+
+```
+
+```{r}
+p1 <- predict(svm.fit_poly, test_new, type = 'prob')
+#p1 <- p1[,2]
+r <- multiclass.roc(as.numeric(as.character(test_new$NObeyesdad)), as.numeric(p1), percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+### SVM Summary (data excluding the BMI & Weight)
+
+After eliminating the BMI & Weight predictor , the linear kernal svm
+train error increased from 10.4% to 35.3% and the test error increased
+from 10.85 to 40%. For radial kernal svm, the train dataset error
+increased from 8.39% to 24.89% and test error increased from 11.61% to
+30.85%.
+
+## Decision Tree (Without Weight and BMI)
+
+```{r}
+
+tree.fit <- rpart(NObeyesdad ~ . , data = train_new, method='class')
+tree.fit
+tree.fit$variable.importance
+```
+
+```{r}
+plot(tree.fit)
+text(tree.fit, pretty=0)
+#zm()
+```
+
+From this tree result, Frequency of consumption of vegetables (FCVC) is
+the most significant predictor that best differentiates the response
+categories. People who consumes more vegetable are highly likely to have
+'Normal_Weight'. Next, Age and Time of Using Device (TUE) are
+significant in splitting the data further into respective obesity
+categories.
+
+```{r}
+# Decision tree Train Test set prediction result
+
+tree.predtrain <- predict(tree.fit, train_new, type = "class")
+tree.predtest <- predict(tree.fit, test_new, type = "class")
+
+train.error <- mean(tree.predtrain != train_new$NObeyesdad)
+test.error <- mean(tree.predtest != test_new$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+
+The misclassification error rate in both train and test data are higher
+without Weight and BMI predictors.
+
+```{r}
+
+confusionMatrix(tree.predtest, 
+                as.factor(test$NObeyesdad))
+
+confusionMatrix(tree.predtrain, 
+                as.factor(train$NObeyesdad))
+```
+
+```{r}
+p1 <- predict(tree.fit, test, type = 'prob')
+p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+### Pruning
+
+```{r}
+best_cp <- tree.fit$cptable[which.min(tree.fit$cptable[, "xerror"]), "CP"]
+best_cp
+```
+
+```{r}
+tree.prune <- prune(tree.fit, cp = best_cp)
+tree.prune
+```
+
+```{r}
+plot(tree.prune)
+text(tree.prune, pretty=0)
+#zm()
+```
+
+```{r}
+# Train Test set prediction result
+
+tree.predtrain <- predict(tree.prune, train_new, type = "class")
+tree.predtest <- predict(tree.prune, test_new, type = "class")
+
+train.error <- mean(tree.predtrain != train_new$NObeyesdad)
+test.error <- mean(tree.predtest != test_new$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ", train.error))
+print(paste("Misclassification error rate in test = ", test.error))
+```
+
+```{r}
+
+confusionMatrix(tree.predtest, 
+                as.factor(test$NObeyesdad))
+
+confusionMatrix(tree.predtrain, 
+                as.factor(train$NObeyesdad))
+```
+
+```{r}
+p1 <- predict(tree.prune, test, type = 'prob')
+p1 <- p1[,2]
+r <- multiclass.roc(test$NObeyesdad, p1, percent = TRUE)
+roc <- r[['rocs']]
+r1 <- roc[[1]]
+plot.roc(r1,
+         print.auc=TRUE,
+         auc.polygon=TRUE,
+         grid=c(0.1, 0.2),
+         grid.col=c("green", "red"),
+         max.auc.polygon=TRUE,
+         auc.polygon.col="lightblue",
+         print.thres=TRUE,
+         main= 'ROC Curve')
+```
+
+## Bagging model with the updated data
+
+```{r}
+options(warn=-1)
+set.seed(545)
+
+train1_new<-train_new
+
+train1_new$NObeyesdad <- mapvalues(train1_new$NObeyesdad,
+                            from=c(0, 1, 2, 3, 4, 5, 6),
+          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
+
+gbag_new <- bagging(as.factor(NObeyesdad) ~ ., data = train1_new,coob=T,nbag=40)
+print(gbag_new)
+```
+
+The Out-of-bag estimate error increased from 4% to 19.23% by eliminating
+BMI & Weight from the dataset.
+
+```{r}
+bag.predtrain_new <- predict(gbag_new, train1_new)
+xtab.train <- table(train_new$NObeyesdad, bag.predtrain_new)
+print("Confussion matrix for train data")
+xtab.train
+
+#test prediction
+test1_new<-test_new
+test1_new$NObeyesdad <- mapvalues(test1_new$NObeyesdad,
+                            from=c(0, 1, 2, 3, 4, 5, 6),
+          to=c("Insufficient_Weight","Normal_Weight","Obesity_Type_I", "Obesity_Type_II",
+                 "Obesity_Type_III", "Overweight_Level_I", "Overweight_Level_II"))
+
+bag.predtest_new <- predict(gbag_new, test1_new)
+xtab.test <- table(test_new$NObeyesdad, bag.predtest_new)
+print("Confussion matrix for test data")
+xtab.test
+```
+
+```{r}
+bag.train.error_new <- mean(bag.predtrain_new != train1_new$NObeyesdad)
+bag.test.error_new <- mean(bag.predtest_new != test1_new$NObeyesdad)
+
+print(paste("Misclassification error rate in train = ",round(bag.train.error_new,4),"%"))
+print(paste("Misclassification error rate in test = ", round(bag.test.error_new,4),"%"))
+
+```
+
+The misclassification error in test data increased from 3% to 18% with
+the new dataset.
+
+Feature Importance
+
+```{r}
+#calculate variable importance
+varimp.data_new <- subset(train1_new, select=-c(NObeyesdad))
+VI <- data.frame(var=names(varimp.data_new), imp=varImp(gbag_new))
+
+#sort variable importance descending
+VI_plot <- VI[order(VI$Overall, decreasing=TRUE),]
+
+#visualize variable importance with horizontal bar plot
+barplot(VI_plot$Overall,
+        names.arg=rownames(VI_plot),
+        horiz=FALSE,
+        col='steelblue',
+        xlab='Variable Importance',
+        las=2,
+        srt=45)
+```
+
+After eliminating Weight & BMI predictors, Age, Height NCP (Consumption
+of high calorific food) are highly correlated with the predictor
+variable
+
+## Random Forest-without BMI
+
+Random Forest without BMI: In order to improve the random forest model
+we have to tune the model to obtain the best mtry value which reduces
+the OOB error. OOB error is important because when choosing the datasets
+for random forest or bagging or boosting it takes only 2/3 rds of data
+and we have to make sure to reduce the error with remaining 3rd data.
+Below we have obtained at mtry value 21 we can produce less OOB error.
+Reason to remove BMI is to understand how well the predictors are
+correlated with the response variable. Now Comparing the results from
+random Forest- with BMI and without BMI dataset, we can see that the
+training error and test error has increased, having training error as
+23% and test error as 45% without BMI.Random Forest also gives
+information on which predictors have the most importance like in this
+case top predictors without BMI are Gender,Age,Height. OOB error is
+recorded as 35.98% without BMI and 2.28% with BMI. So we say that
+Modelling with BMI includes highly correlated variables and modelling
+without BMI has highly uncorrelated variables which explains why our
+outputs are higher in case of OOB error and test,training errors.
+
+```{r}
+#TuneRF-to find best mtry
+set.seed(1)
+bestmtry_new <-tuneRF(sapply(train_new, as.numeric),sapply(train_new$NObeyesdad, as.numeric),improve = 0.01, stepFactor = 1.5, ntree=5000, trace = TRUE, plot = TRUE)
+print(bestmtry_new)
+
+#Random forest model
+set.seed(545)
+library(randomForest)
+
+rf.fit_new <- randomForest(
+  NObeyesdad ~ ., 
+  data = sapply(train_new, as.numeric),
+  importance = TRUE,
+  mtry = 21,
+  ntree = 5000
+)
+
+rf.pred_new <- predict(rf.fit_new, train_new, type='class')
+rf.predtest_new <- predict(rf.fit_new, test_new, type='class')
+
+print("--- Training Error - Random Forest ---")
+print(mean(round(rf.pred_new) != train_new$NObeyesdad))
+
+print("--- Test Error - Random Forest ---")
+print(mean(round(rf.predtest_new) != test_new$NObeyesdad))
+
+rf.fit_new
+varImpPlot(rf.fit_new)
+importance(rf.fit_new)
+```
+
+# Results Summary
+
+The comprehensive results were presented in the previous section with
+explanation and reasoning for the performance of different models.
+Decision tree was the simplest and easy to interpret model that also
+performs well with misclassification error rate of approximately 3% in
+test data. In terms of performance, stacking performs well. Moreover,
+the error rate for bagging, random forest and stacking are almost closer
+that may not be impactful in the real world. Thus depending on the
+business requirement and budget constraint, just BMI and weight
+predictors or all predictors can be used. Also, either performance
+oriented model or simple interpretable model can be preferred
+
+# Conclusion
+
+The Obesity level dataset was analyzed, preprocessed and different
+supervised models were fitted to the data and the results were analyzed.
+In terms of performance and lowest misclassification error rate,
+Stacking (SVM + Decision Tree --\> Decision Tree --\> Output) is the
+best model. In terms of simplicity and ease of interpretation, Decision
+tree performs the best. The difference in test error rate of these two
+models are less than 1.5%. BMI and weight play significant roles in
+determining the obesity category of an individual. Without these two,
+the influence of other predictors on the response variable is minimal
+and model fitted on them resulted in high misclassification error. Thus,
+depending on the business requirement and budget constraints, one
+predictors over the other or one model over the other can be preferred.
+
+# Authors Contributions Summary:
+
+**Priyanka Bhoite**:
+
+Data Cleaning & Preparation Exploratory Data Analysis
+
+1.  Analysis of Target Variable Distribution
+2.   Analyzing Distributions of Numeric Variables
+3.  Analyzing the categorical data and count
+4.  Relationship between Weight & Height for both genders Modeling -
+    Support Vector Machines & Bagging (for dataset with BMI) Support
+    Vector Machines & Bagging (for dataset without BMI)
+5.  Team Discussion
+
+**Akhilesh Nampalli:**
+
+1\. Initial Project selection, Guiding on materials and methods to use,
+Validating EDA and Modelling methods.
+
+2\. Bagging
+
+3\. Randon forest- with BMI, without BMI
+
+4\. Team Discussion
+
+**Pradeepsurya Rajendran:**
+
+1.  Complete Exploratory Data Analysis in Python. Created an interactive
+    visualization plots and rendered it in HTML, presentable to the
+    clients.
+
+-   Descriptive statistics measure
+-   Quantile statistics measure
+-   Variable Interactions
+-   Correlation Analysis (Pearson, Spearman, KendallTau)
+-   Missing values check
+
+2.  Categorical Encoding
+3.  Feature Engineering (Experimented with different features and chose
+    BMI)
+4.  Decision Tree
+5.  Tree Pruning
+6.  SVM Model Tuning
+7.  Stacking
+8.  Model Assessments using ROC curve and Confusion Matrix
+9.  Code Review
+10. Team Discussion
+
+# Github Repository
+
+<https://github.com/rpradeepsurya/sta545_statistical_data_mining_project>
+
+# References
+
+1.  [Dataset - Estimation of Obesity
+    Levels](https://archive.ics.uci.edu/ml/datasets/Estimation+of+obesity+levels+based+on+eating+habits+and+physical+condition+)
+
+2.  Lecture Slides
+
+3.  R Documentation
