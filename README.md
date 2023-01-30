@@ -6,6 +6,5 @@ Dataset:
  
  EDA with interactive visualization (Created using Python)
   - [Obesity Data Analysis.html](https://github.com/rpradeepsurya/sta545_statistical_data_mining_project/blob/main/Obesity%20Data%20Analysis.html) 
-  - Download and open it in the browser
  
  For more information on EDA and predictive modelling in R, please refer project.Rmd
